@@ -5,7 +5,7 @@ private struct WeakObject {
     weak var object: AnyObject?
 }
 
-private let threadSafetyQueue = dispatch_queue_create("IZEvent.", DISPATCH_QUEUE_SERIAL)
+private let threadSafetyQueue = dispatch_queue_create("IZEvent.threadSafetyQueue", DISPATCH_QUEUE_SERIAL)
 
 /**
  A pure-swift alternative to NSNotificationCenter. It's safer and more convenient.
@@ -46,7 +46,7 @@ public class IZEvent<ArgumentType> {
             self.removeNullListeners()
             
             // If called again, put it to the end of the list.
-            self._removeFunctionForInstance(instance)
+            self.removeFunctionForInstance(instance)
             
             self.functions.append((
                 // Used to tell whether or not this event has outlived the listener instance.

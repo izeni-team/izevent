@@ -127,7 +127,7 @@ class ExampleTests: XCTestCase {
                 // Test removal of listener.
                 event.removeFunctionForInstance(listenerA)
                 event.emit()
-                
+
                 wait {
                     XCTAssert(Listener.orderOfDelivery == [listenerB] && listenerA.noArgDate == nil)
                     reset()

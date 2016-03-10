@@ -21,7 +21,6 @@ private let threadSafetyQueue = dispatch_queue_create("IZEvent.threadSafetyQueue
  Defaults to main queue, but can be changed. Makes no guarantees against deadlocks if queue != main queue.
  */
 public class IZEvent<ArgumentType> {
-    private typealias InstanceIdentifier = Int
     public typealias Function = ArgumentType -> Void
     
     private var functions: [(weak: WeakObject, function: Function)] = []
@@ -43,7 +42,7 @@ public class IZEvent<ArgumentType> {
     }
     
     /**
-     There can only be one function registered per instance. And it will be called asynchronously, on the main thread.
+     There can only be one function registered per instance. And it will be called asynchronously, on the main thread (by default anyways).
      
      If you call this again with the same instance, the previously associated function will be overridden with this one.
      */
@@ -66,6 +65,21 @@ public class IZEvent<ArgumentType> {
                 }
             ))
         }
+    }
+    
+    private func threadSafety(closure: () -> Void) {
+        if asynchronous {
+            dispatch_async(threadSafetyQueue, closure)
+        } else {
+            dispatch_sync(threadSafetyQueue, closure)
+        }
+    }
+    
+    /**
+     We manually clean up listeners that have deallocated whenever setFunction or emit is called.
+     */
+    private func removeNullListeners() {
+        functions = functions.filter({ $0.weak.object != nil })
     }
     
     public func removeFunctionForInstance(instance: AnyObject) {
@@ -109,14 +123,6 @@ public class IZEvent<ArgumentType> {
         }
     }
     
-    private func threadSafety(closure: () -> Void) {
-        if asynchronous {
-            dispatch_async(threadSafetyQueue, closure)
-        } else {
-            dispatch_sync(threadSafetyQueue, closure)
-        }
-    }
-    
     private func execute(argument argument: ArgumentType, object: AnyObject? = nil) {
         let exec = { () -> Void in
             for listener in self.functions {
@@ -134,12 +140,5 @@ public class IZEvent<ArgumentType> {
         } else {
             exec()
         }
-    }
-    
-    /**
-     We manually clean up listeners that have deallocated whenever setFunction or emit is called.
-     */
-    private func removeNullListeners() {
-        functions = functions.filter({ $0.weak.object != nil })
     }
 }

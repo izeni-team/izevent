@@ -1,4 +1,4 @@
-# Project Name
+# IZEvent
 
 IZEvent is a pure-Swift alternative to NSNotificationCenter. It strives to be easy, safe, and simple. Pro's over NSNotificationCenter:
 

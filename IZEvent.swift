@@ -97,6 +97,26 @@ public class IZEvent<ArgumentType> {
         }
     }
     
+    /**
+     Used for setting class/static functions as recipients.
+     */
+    public func set<InstanceType: AnyObject>(instanceType: InstanceType.Type, function: ArgumentType -> Void) {
+        threadSafety {
+            self.removeNullListeners()
+            
+            // If called again, put it to the end of the list.
+            self._remove(instanceType)
+            
+            self.functions.append((
+                // Used to tell whether or not this event has outlived the listener instance.
+                weak: WeakObject(object: instanceType),
+                
+                // Instance must be weak to avoid a retention cycle (in other words, to avoid memory leaks).
+                function: function
+            ))
+        }
+    }
+    
     private func threadSafety(closure: () -> Void) {
         dispatch_sync(threadSafetyQueue, closure)
     }

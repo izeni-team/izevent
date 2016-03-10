@@ -12,6 +12,7 @@ import IZEvent
 
 class Listener: Equatable, CustomDebugStringConvertible {
     static var orderOfDelivery = [Listener]()
+    static var staticFuncDelivered = false
     
     let id = NSUUID()
     var noArgDate: NSDate?
@@ -20,6 +21,7 @@ class Listener: Equatable, CustomDebugStringConvertible {
     
     init() {
         Listener.orderOfDelivery.removeAll()
+        Listener.staticFuncDelivered = false
     }
     
     func reset() {
@@ -47,6 +49,10 @@ class Listener: Equatable, CustomDebugStringConvertible {
     
     func delivered() {
         Listener.orderOfDelivery.append(self)
+    }
+    
+    static func staticFunc() {
+        Listener.staticFuncDelivered = true
     }
 }
 
@@ -137,8 +143,16 @@ class ExampleTests: XCTestCase {
                     event.emit()
                     wait {
                         XCTAssert(Listener.orderOfDelivery.isEmpty && listenerA.noArgDate == nil && listenerB.noArgDate == nil)
+                        event.removeAll()
                         reset()
-                        completion()
+                        
+                        // Test static function
+                        event.set(Listener.self, function: Listener.staticFunc)
+                        event.emit()
+                        wait {
+                            XCTAssert(Listener.staticFuncDelivered)
+                            completion()
+                        }
                     }
                 }
             }

@@ -88,7 +88,7 @@ public class IZEvent<ArgumentType> {
         }
     }
     
-    private func _removeFunctionForInstance(instance: AnyObject, object: AnyObject? = nil) {
+    private func _removeFunctionForInstance(instance: AnyObject) {
         self.removeNullListeners()
         if let index = self.functions.indexOf({ $0.weak.object === instance }) {
             self.functions.removeAtIndex(index)
@@ -123,7 +123,7 @@ public class IZEvent<ArgumentType> {
         }
     }
     
-    private func execute(argument argument: ArgumentType, object: AnyObject? = nil) {
+    private func execute(argument argument: ArgumentType) {
         let exec = { () -> Void in
             for listener in self.functions {
                 listener.function(argument)

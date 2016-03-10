@@ -108,8 +108,8 @@ class ExampleTests: XCTestCase {
         event.emit()
         
         // Test order of delivery.
-        event.setFunction(Listener.noArg, forInstance: listenerA)
-        event.setFunction(Listener.noArg, forInstance: listenerB)
+        event.set(listenerA, function: Listener.noArg)
+        event.set(listenerB, function: Listener.noArg)
         event.emit()
         
         wait {
@@ -117,7 +117,7 @@ class ExampleTests: XCTestCase {
             reset()
             
             // Test reverse order of delivery.
-            event.setFunction(Listener.noArg, forInstance: listenerA) // This is supposed to put A after B
+            event.set(listenerA, function: Listener.noArg) // This is supposed to put A after B
             event.emit()
             
             wait {
@@ -125,7 +125,7 @@ class ExampleTests: XCTestCase {
                 reset()
                 
                 // Test removal of listener.
-                event.removeFunctionForInstance(listenerA)
+                event.remove(listenerA)
                 event.emit()
 
                 wait {
@@ -133,7 +133,7 @@ class ExampleTests: XCTestCase {
                     reset()
                     
                     // Test removal of all functions
-                    event.removeAllFunctions()
+                    event.removeAll()
                     event.emit()
                     wait {
                         XCTAssert(Listener.orderOfDelivery.isEmpty && listenerA.noArgDate == nil && listenerB.noArgDate == nil)
@@ -148,7 +148,7 @@ class ExampleTests: XCTestCase {
     func testOneArg(completion: () -> Void) {
         let event = IZEvent<String>(synchronous: true)
         let listener = Listener()
-        event.setFunction(Listener.stringArg, forInstance: listener)
+        event.set(listener, function: Listener.stringArg)
         event.emit("Test")
         XCTAssert(listener.stringArgValue == "Test")
         completion()
@@ -158,7 +158,7 @@ class ExampleTests: XCTestCase {
         let event = IZEvent<(str: String, int: Int)>(synchronous: false)
         let listener = Listener()
         
-        event.setFunction(Listener.multiArg, forInstance: listener)
+        event.set(listener, function: Listener.multiArg)
         event.emit((str: "Hello, World!", int: 3))
         wait {
             print(Listener.orderOfDelivery)

@@ -76,12 +76,12 @@ public class IZEvent<ArgumentType> {
      If you call this again with the same instance, the previously associated function will be overridden with this one.
      In other words, only one function per instance can be registered with an event at a time.
      */
-    public func setFunction<InstanceType: AnyObject>(function: InstanceType -> ArgumentType -> Void, forInstance instance: InstanceType) {
+    public func set<InstanceType: AnyObject>(instance: InstanceType, function: InstanceType -> ArgumentType -> Void) {
         threadSafety {
             self.removeNullListeners()
             
             // If called again, put it to the end of the list.
-            self._removeFunctionForInstance(instance)
+            self._remove(instance)
             
             self.functions.append((
                 // Used to tell whether or not this event has outlived the listener instance.
@@ -108,20 +108,20 @@ public class IZEvent<ArgumentType> {
         functions = functions.filter({ $0.weak.object != nil })
     }
     
-    public func removeFunctionForInstance(instance: AnyObject) {
+    public func remove(instance: AnyObject) {
         threadSafety {
-            self._removeFunctionForInstance(instance)
+            self._remove(instance)
         }
     }
     
-    private func _removeFunctionForInstance(instance: AnyObject) {
+    private func _remove(instance: AnyObject) {
         self.removeNullListeners()
         if let index = self.functions.indexOf({ $0.weak.object === instance }) {
             self.functions.removeAtIndex(index)
         }
     }
     
-    public func removeAllFunctions() {
+    public func removeAll() {
         threadSafety {
             self.functions.removeAll()
         }

@@ -55,10 +55,12 @@ public class IZEvent<ArgumentType> {
     }
     
     /**
-     There can only be one function registered per instance. And it will be called asynchronously, on the main thread
-     (by default anyways).
+     There can only be one function registered per instance. And it will be called asynchronously on the main thread
+     by default. Check the event declaration to see whether or not it will be synchronous and which queue it will be
+     delivered on.
      
      If you call this again with the same instance, the previously associated function will be overridden with this one.
+     In other words, only one function per instance can be registered with an event at a time.
      */
     public func setFunction<InstanceType: AnyObject>(function: InstanceType -> ArgumentType -> Void, forInstance instance: InstanceType) {
         threadSafety {
@@ -82,11 +84,7 @@ public class IZEvent<ArgumentType> {
     }
     
     private func threadSafety(closure: () -> Void) {
-        if asynchronous {
-            dispatch_async(threadSafetyQueue, closure)
-        } else {
-            dispatch_sync(threadSafetyQueue, closure)
-        }
+        dispatch_sync(threadSafetyQueue, closure)
     }
     
     /**

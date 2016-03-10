@@ -46,7 +46,7 @@ public class IZEvent<ArgumentType> {
             self.removeNullListeners()
             
             // If called again, put it to the end of the list.
-            self.removeFunctionForInstance(instance)
+            self._removeFunctionForInstance(instance)
             
             self.functions.append((
                 // Used to tell whether or not this event has outlived the listener instance.

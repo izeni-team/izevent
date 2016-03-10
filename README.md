@@ -17,7 +17,7 @@ pod 'IZEvent', :git => 'https://dev.izeni.net/bhenderson/izevent.git'
 
 ## Usage
 
-1: Create an event.
+1: Create an event
 
 ```swift
 class MyService {
@@ -26,7 +26,7 @@ class MyService {
 }
 ```
 
-2: Listen for the event.
+2: Listen for an event
 
 ```swift
 class MyViewController: UIViewController {
@@ -48,7 +48,7 @@ class MyViewController: UIViewController {
 }
 ```
 
-3: Emit the event.
+3: Emit an event
 
 ```swift
 class MyService {
@@ -71,6 +71,7 @@ class MyService {
 ## History
 
 v0.2.0 - Functions are shorter. Added support for static functions. Synchronous by default.
+
 v0.1.0 - First version.
 
 ## Credits

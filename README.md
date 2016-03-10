@@ -32,8 +32,8 @@ class MyService {
 class MyViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
-        MyService.simpleEvent.setFunction(MyViewController.simpleEventEmitted, forInstance: self)
-        MyService.complexEvent.setFunction(MyViewController.complexEventEmitted, forInstance: self)
+        MyService.simpleEvent.set(self, function: MyViewController.simpleEventEmitted)
+        MyService.complexEvent.set(self, function: MyViewController.complexEventEmitted)
     }
 
     func simpleEventEmitted() {

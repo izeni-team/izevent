@@ -21,8 +21,8 @@ pod 'IZEvent', :git => 'https://dev.izeni.net/bhenderson/izevent.git'
 
 ```swift
 class MyService {
-    static let simpleEvent = IZEvent<Void>() // Asynchronous, main thread delivery by default.
-    static let complexEvent = IZEvent<(String, Int)>(synchronous: true, queue: dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0))
+    static let simpleEvent = IZEvent<Void>() // Synchronous, main thread delivery by default.
+    static let complexEvent = IZEvent<(String, Int)>(queue: dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0))
 }
 ```
 
@@ -55,7 +55,7 @@ class MyService {
     ...
     func somethingHappened() {
         MyService.simpleEvent.emit()
-        MyService.complexEvent.emit(("How Many?", 3)) // Will print first, because complexEvent is synchronous
+        MyService.complexEvent.emit(("How Many?", 3))
     }
 }
 ```

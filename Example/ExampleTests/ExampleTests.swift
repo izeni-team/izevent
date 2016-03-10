@@ -93,7 +93,7 @@ class ExampleTests: XCTestCase {
     }
     
     func testNoArgs(synchronous synchronous: Bool, completion: () -> Void) {
-        let event = IZEvent<Void>(synchronous: synchronous)
+        let event = IZEvent<Void>(synchronous: synchronous, queue: dispatch_get_main_queue())
         let listenerA = Listener()
         let listenerB = Listener()
         let wait = self.wait

@@ -70,6 +70,7 @@ class MyService {
 
 ## History
 
+v0.2.0 - Functions are shorter. Added support for static functions. Synchronous by default.
 v0.1.0 - First version.
 
 ## Credits

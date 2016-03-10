@@ -1,5 +1,5 @@
 PODS:
-  - IZEvent (0.1.0)
+  - IZEvent (0.2.0)
 
 DEPENDENCIES:
   - IZEvent (from `../`)
@@ -9,6 +9,6 @@ EXTERNAL SOURCES:
     :path: "../"
 
 SPEC CHECKSUMS:
-  IZEvent: 15ba6b46dc3e5537e9c31f7d9ac5e51c80ea1ad4
+  IZEvent: 93252676bfcdea067967af9dd8d76e5bdc2adc02
 
 COCOAPODS: 0.39.0

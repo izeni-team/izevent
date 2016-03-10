@@ -1,8 +1,19 @@
 // The MIT License (MIT)
+//
 // Copyright (c) 2016 Izeni, Inc.
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+// the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+// ermit persons to whom the Software is furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+// the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+// WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
+// OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /**
  Used to tell whether or not the event has outlived the listener.
@@ -21,9 +32,7 @@ private let threadSafetyQueue = dispatch_queue_create("IZEvent.threadSafetyQueue
  Defaults to main queue, but can be changed. Makes no guarantees against deadlocks if queue != main queue.
  */
 public class IZEvent<ArgumentType> {
-    public typealias Function = ArgumentType -> Void
-    
-    private var functions: [(weak: WeakObject, function: Function)] = []
+    private var functions: [(weak: WeakObject, function: ArgumentType -> Void)] = []
     private let asynchronous: Bool
     private let queue: dispatch_queue_t?
     
@@ -35,6 +44,10 @@ public class IZEvent<ArgumentType> {
         self.init(synchronous: true, queue: dispatch_get_main_queue())
     }
     
+    /**
+     If queue is passed in as nil, then GCD won't be used at all (nil does not mean "main queue"). If you want the main
+     queue, pass it in or use another initializer.
+     */
     public init(synchronous: Bool, queue: dispatch_queue_t?) {
         self.asynchronous = !synchronous
         self.queue = queue
@@ -42,11 +55,12 @@ public class IZEvent<ArgumentType> {
     }
     
     /**
-     There can only be one function registered per instance. And it will be called asynchronously, on the main thread (by default anyways).
+     There can only be one function registered per instance. And it will be called asynchronously, on the main thread
+     (by default anyways).
      
      If you call this again with the same instance, the previously associated function will be overridden with this one.
      */
-    public func setFunction<InstanceType: AnyObject>(function: InstanceType -> Function, forInstance instance: InstanceType) {
+    public func setFunction<InstanceType: AnyObject>(function: InstanceType -> ArgumentType -> Void, forInstance instance: InstanceType) {
         threadSafety {
             self.removeNullListeners()
             

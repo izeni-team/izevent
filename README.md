@@ -15,6 +15,12 @@ Add the folowing to your Podfile:
 pod 'IZEvent', :git => 'https://dev.izeni.net/bhenderson/izevent.git'
 ```
 
+If you want to specify a specific version of IZEvent:
+
+```
+pod 'IZEvent', :git => 'https://dev.izeni.net/bhenderson/izevent.git', :commit => 'v0.2.0'
+```
+
 ## Usage
 
 1: Create an event
@@ -32,8 +38,8 @@ class MyService {
 class MyViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
-        MyService.simpleEvent.set(self, function: MyViewController.simpleEventEmitted)
-        MyService.complexEvent.set(self, function: MyViewController.complexEventEmitted)
+        MyService.simpleEvent.register(self, function: MyViewController.simpleEventEmitted)
+        MyService.complexEvent.register(self, function: MyViewController.complexEventEmitted)
     }
 
     func simpleEventEmitted() {
@@ -54,8 +60,8 @@ class MyViewController: UIViewController {
 class MyService {
     ...
     func somethingHappened() {
-        MyService.simpleEvent.emit()
-        MyService.complexEvent.emit(("How Many?", 3))
+        MyService.simpleEvent.post()
+        MyService.complexEvent.post(("How Many?", 3))
     }
 }
 ```
@@ -69,6 +75,8 @@ class MyService {
 5. Submit a pull request :D
 
 ## History
+
+v0.3.0 - Renamed set/remove/emit to register/unregister/post, and added postWhenAppEntersForeground.
 
 v0.2.0 - Functions are shorter. Added support for static functions. Synchronous by default.
 

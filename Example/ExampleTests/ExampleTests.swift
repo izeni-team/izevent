@@ -111,44 +111,44 @@ class ExampleTests: XCTestCase {
         }
         
         // Make sure it doesn't crash when nothing is listening.
-        event.emit()
+        event.post()
         
         // Test order of delivery.
-        event.set(listenerA, function: Listener.noArg)
-        event.set(listenerB, function: Listener.noArg)
-        event.emit()
+        event.register(listenerA, function: Listener.noArg)
+        event.register(listenerB, function: Listener.noArg)
+        event.post()
         
         wait {
             XCTAssert(Listener.orderOfDelivery == [listenerA, listenerB])
             reset()
             
             // Test reverse order of delivery.
-            event.set(listenerA, function: Listener.noArg) // This is supposed to put A after B
-            event.emit()
+            event.register(listenerA, function: Listener.noArg) // This is supposed to put A after B
+            event.post()
             
             wait {
                 XCTAssert(Listener.orderOfDelivery == [listenerB, listenerA])
                 reset()
                 
                 // Test removal of listener.
-                event.remove(listenerA)
-                event.emit()
+                event.unregister(listenerA)
+                event.post()
 
                 wait {
                     XCTAssert(Listener.orderOfDelivery == [listenerB] && listenerA.noArgDate == nil)
                     reset()
                     
                     // Test removal of all functions
-                    event.removeAll()
-                    event.emit()
+                    event.unregisterAll()
+                    event.post()
                     wait {
                         XCTAssert(Listener.orderOfDelivery.isEmpty && listenerA.noArgDate == nil && listenerB.noArgDate == nil)
-                        event.removeAll()
+                        event.unregisterAll()
                         reset()
                         
                         // Test static function
-                        event.set(Listener.self, function: Listener.staticFunc)
-                        event.emit()
+                        event.register(Listener.self, function: Listener.staticFunc)
+                        event.post()
                         wait {
                             XCTAssert(Listener.staticFuncDelivered)
                             completion()
@@ -162,8 +162,8 @@ class ExampleTests: XCTestCase {
     func testOneArg(completion: () -> Void) {
         let event = IZEvent<String>(synchronous: true)
         let listener = Listener()
-        event.set(listener, function: Listener.stringArg)
-        event.emit("Test")
+        event.register(listener, function: Listener.stringArg)
+        event.post("Test")
         XCTAssert(listener.stringArgValue == "Test")
         completion()
     }
@@ -172,14 +172,23 @@ class ExampleTests: XCTestCase {
         let event = IZEvent<(str: String, int: Int)>(synchronous: false)
         let listener = Listener()
         
-        event.set(listener, function: Listener.multiArg)
-        event.emit((str: "Hello, World!", int: 3))
+        event.register(listener, function: Listener.multiArg)
+        event.post((str: "Hello, World!", int: 3))
         wait {
             print(Listener.orderOfDelivery)
             XCTAssert(Listener.orderOfDelivery == [listener])
             XCTAssert(listener.multiArgValue != nil && listener.multiArgValue!.str == "Hello, World!" && listener.multiArgValue!.int == 3)
             completion()
         }
+    }
+    
+    func testPostInForeground() {
+        let event = IZEvent<Void>()
+        let listener = Listener()
+        event.register(listener, function: Listener.noArg)
+        assert(UIApplication.sharedApplication().applicationState == .Active)
+        event.postWhenAppEntersForeground()
+        XCTAssert(Listener.orderOfDelivery == [listener])
     }
     
     func wait(closure: () -> Void) {

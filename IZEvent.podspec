@@ -1,6 +1,6 @@
 Pod::Spec.new do |spec|
   spec.name = 'IZEvent'
-  spec.version = '0.2.0'
+  spec.version = '0.3.0'
   spec.license = { :type => 'MIT' }
   spec.homepage = 'https://dev.izeni.net/bhenderson/izevent'
   spec.authors = { 'Bryan Henderson' => 'bhenderson@izeni.com' }

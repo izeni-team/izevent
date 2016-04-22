@@ -33,11 +33,15 @@ private let threadSafetyQueue = dispatch_queue_create("IZEvent.threadSafetyQueue
  
  Makes no guarantees against deadlocks if queue != main queue.
  */
-public class IZEvent<ArgumentType> {
-    private typealias Function = (weak: WeakObject, function: ArgumentType -> Void)
-    private var functions: [Function] = []
+public class IZEvent<ValueType> {
+    private typealias Function = (weak: WeakObject, function: ValueType -> Void)
+    private var listeners: [Function] = []
     private let asynchronous: Bool
     private let queue: dispatch_queue_t?
+    
+    // Delay until foreground
+    private var delayUntilForegroundListener: IZEventDelayUntilForegroundListener?
+    private var delayUntilForegroundQueue: [ValueType] = []
     
     /**
      Uses the main queue. Synchronous.
@@ -54,7 +58,7 @@ public class IZEvent<ArgumentType> {
     }
     
     /**
-     Synchronous.
+     Synchronous. If queue is passed in as nil, then GCD won't be used at all (nil does not mean "main queue").
      */
     public convenience init(queue: dispatch_queue_t?) {
         self.init(synchronous: true, queue: queue)
@@ -76,14 +80,14 @@ public class IZEvent<ArgumentType> {
      If you call this again with the same instance, the previously associated function will be overridden with this one.
      In other words, only one function per instance can be registered with an event at a time.
      */
-    public func set<InstanceType: AnyObject>(instance: InstanceType, function: InstanceType -> ArgumentType -> Void) {
+    public func register<InstanceType: AnyObject>(instance: InstanceType, function: InstanceType -> ValueType -> Void) {
         threadSafety {
             self.removeNullListeners()
             
             // If called again, put it to the end of the list.
-            self._remove(instance)
+            self._unregister(instance)
             
-            self.functions.append((
+            self.listeners.append((
                 // Used to tell whether or not this event has outlived the listener instance.
                 weak: WeakObject(object: instance),
                 
@@ -98,16 +102,18 @@ public class IZEvent<ArgumentType> {
     }
     
     /**
-     Used for setting class/static functions as recipients.
+     Used for setting class/static functions as recipients, as opposed to instances.
+     
+     Only 1 function per class is supported.
      */
-    public func set<InstanceType: AnyObject>(instanceType: InstanceType.Type, function: ArgumentType -> Void) {
+    public func register<InstanceType: AnyObject>(instanceType: InstanceType.Type, function: ValueType -> Void) {
         threadSafety {
             self.removeNullListeners()
             
             // If called again, put it to the end of the list.
-            self._remove(instanceType)
+            self._unregister(instanceType)
             
-            self.functions.append((
+            self.listeners.append((
                 // Used to tell whether or not this event has outlived the listener instance.
                 weak: WeakObject(object: instanceType),
                 
@@ -125,52 +131,59 @@ public class IZEvent<ArgumentType> {
      We manually clean up listeners that have deallocated whenever setFunction or emit is called.
      */
     private func removeNullListeners() {
-        functions = functions.filter({ $0.weak.object != nil })
+        listeners = listeners.filter({ $0.weak.object != nil })
     }
     
-    public func remove(instance: AnyObject) {
+    // Can unregister either an instance or an individual class.
+    public func unregister(instance: AnyObject) {
         threadSafety {
-            self._remove(instance)
+            self._unregister(instance)
         }
     }
     
-    private func _remove(instance: AnyObject) {
+    private func _unregister(instance: AnyObject) {
         self.removeNullListeners()
-        if let index = self.functions.indexOf({ $0.weak.object === instance }) {
-            self.functions.removeAtIndex(index)
+        if let index = self.listeners.indexOf({ $0.weak.object === instance }) {
+            self.listeners.removeAtIndex(index)
         }
     }
     
-    public func removeAll() {
+    public func unregisterAll() {
         threadSafety {
-            self.functions.removeAll()
+            self.listeners.removeAll()
         }
+    }
+    
+    public func post(value: ValueType) {
+        post([value])
     }
     
     /**
      Calls all functions registered with this event.
      */
-    public func emit(argument: ArgumentType) {
+    private func post(values: [ValueType]) {
         var functions: [Function]?
         
         threadSafety {
-            guard !self.functions.isEmpty else {
+            guard !self.listeners.isEmpty else {
                 return
             }
             
             self.removeNullListeners()
-            functions = self.functions
+            functions = self.listeners
         }
         
         if let functions = functions {
-            self.execute(functions, argument: argument)
+            for value in values {
+                self.execute(functions, value: value)
+            }
         }
     }
     
-    private func execute(functions: [Function], argument: ArgumentType) {
+    private func execute(listeners: [Function], value: ValueType) {
         let exec = { () -> Void in
-            for listener in functions {
-                listener.function(argument)
+            for listener in listeners {
+                listener.function(value)
             }
         }
 
@@ -183,6 +196,59 @@ public class IZEvent<ArgumentType> {
             dispatch_sync(queue, exec)
         } else {
             exec()
+        }
+    }
+}
+
+private protocol IZEventDelayUntilForegroundListenerDelegate: class {
+    func didEnterForeground()
+}
+
+private class IZEventDelayUntilForegroundListener {
+    weak var delegate: IZEventDelayUntilForegroundListenerDelegate?
+    
+    init(delegate: IZEventDelayUntilForegroundListenerDelegate) {
+        self.delegate = delegate
+        NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(willEnterForeground), name: UIApplicationWillEnterForegroundNotification, object: nil)
+    }
+    
+    deinit {
+        NSNotificationCenter.defaultCenter().removeObserver(self)
+    }
+    
+    @objc func willEnterForeground() {
+        // App state is not yet "Foreground," but it will be after this function is called.
+        dispatch_async(dispatch_get_main_queue()) {
+            assert(UIApplication.sharedApplication().applicationState != .Active)
+            self.delegate?.didEnterForeground()
+        }
+    }
+}
+
+extension IZEvent: IZEventDelayUntilForegroundListenerDelegate {
+    func didEnterForeground() {
+        var values: [ValueType]!
+        threadSafety {
+            values = self.delayUntilForegroundQueue
+            self.delayUntilForegroundQueue.removeAll()
+            self.delayUntilForegroundListener = nil
+        }
+        post(values)
+    }
+}
+
+ extension IZEvent {
+    public func postWhenAppEntersForeground(value: ValueType) {
+        if UIApplication.sharedApplication().applicationState == .Active {
+            post(value)
+        } else {
+            threadSafety {
+                self.delayUntilForegroundQueue.append(value)
+                
+                if self.delayUntilForegroundListener == nil {
+                    self.delayUntilForegroundListener = IZEventDelayUntilForegroundListener(delegate: self)
+                }
+            }
         }
     }
 }

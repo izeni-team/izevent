@@ -39,10 +39,6 @@ public class IZEvent<ValueType> {
     private let asynchronous: Bool
     private let queue: dispatch_queue_t?
     
-    // Delay until foreground
-    private var delayUntilForegroundListener: IZEventDelayUntilForegroundListener?
-    private var delayUntilForegroundQueue: [ValueType] = []
-    
     /**
      Uses the main queue. Synchronous.
      */
@@ -196,59 +192,6 @@ public class IZEvent<ValueType> {
             dispatch_sync(queue, exec)
         } else {
             exec()
-        }
-    }
-}
-
-private protocol IZEventDelayUntilForegroundListenerDelegate: class {
-    func didEnterForeground()
-}
-
-private class IZEventDelayUntilForegroundListener {
-    weak var delegate: IZEventDelayUntilForegroundListenerDelegate?
-    
-    init(delegate: IZEventDelayUntilForegroundListenerDelegate) {
-        self.delegate = delegate
-        NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(willEnterForeground), name: UIApplicationWillEnterForegroundNotification, object: nil)
-    }
-    
-    deinit {
-        NSNotificationCenter.defaultCenter().removeObserver(self)
-    }
-    
-    @objc func willEnterForeground() {
-        // App state is not yet "Foreground," but it will be after this function is called.
-        dispatch_async(dispatch_get_main_queue()) {
-            assert(UIApplication.sharedApplication().applicationState != .Active)
-            self.delegate?.didEnterForeground()
-        }
-    }
-}
-
-extension IZEvent: IZEventDelayUntilForegroundListenerDelegate {
-    func didEnterForeground() {
-        var values: [ValueType]!
-        threadSafety {
-            values = self.delayUntilForegroundQueue
-            self.delayUntilForegroundQueue.removeAll()
-            self.delayUntilForegroundListener = nil
-        }
-        post(values)
-    }
-}
-
- extension IZEvent {
-    public func postWhenAppEntersForeground(value: ValueType) {
-        if UIApplication.sharedApplication().applicationState == .Active {
-            post(value)
-        } else {
-            threadSafety {
-                self.delayUntilForegroundQueue.append(value)
-                
-                if self.delayUntilForegroundListener == nil {
-                    self.delayUntilForegroundListener = IZEventDelayUntilForegroundListener(delegate: self)
-                }
-            }
         }
     }
 }

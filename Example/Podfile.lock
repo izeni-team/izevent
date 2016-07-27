@@ -1,20 +1,16 @@
 PODS:
-  - IZEvent (0.2.0)
+  - IZEvent (0.3.0)
 
 DEPENDENCIES:
-  - IZEvent (from `https://dev.izeni.net/bhenderson/izevent.git`, commit `v0.2.0`)
+  - IZEvent (from `../`)
 
 EXTERNAL SOURCES:
   IZEvent:
-    :commit: v0.2.0
-    :git: https://dev.izeni.net/bhenderson/izevent.git
-
-CHECKOUT OPTIONS:
-  IZEvent:
-    :commit: v0.2.0
-    :git: https://dev.izeni.net/bhenderson/izevent.git
+    :path: "../"
 
 SPEC CHECKSUMS:
-  IZEvent: 93252676bfcdea067967af9dd8d76e5bdc2adc02
+  IZEvent: 48103a4c01963a8a6294df1015041ef2e9137c16
 
-COCOAPODS: 0.39.0
+PODFILE CHECKSUM: 02a723833912bf37eee3dfaacfadf6646293450c
+
+COCOAPODS: 1.0.1

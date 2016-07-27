@@ -1,3 +1,5 @@
 use_frameworks!
 
-pod 'IZEvent', :git => 'https://dev.izeni.net/bhenderson/izevent.git', :commit => 'v0.2.0'
+target 'Example' do
+  pod 'IZEvent', :path => '../'
+end

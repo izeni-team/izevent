@@ -15,6 +15,8 @@
 // OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import Foundation
+
 /**
  Used to tell whether or not the event has outlived the listener.
  */
@@ -22,7 +24,7 @@ private struct WeakObject {
     weak var object: AnyObject?
 }
 
-private let threadSafetyQueue = dispatch_queue_create("IZEvent.threadSafetyQueue", DISPATCH_QUEUE_SERIAL)
+fileprivate let threadSafetyQueue = DispatchQueue(label: "IZEvent.threadSafetyQueue")
 
 /**
  A pure-swift alternative to NSNotificationCenter. It's safer and more convenient.
@@ -33,11 +35,11 @@ private let threadSafetyQueue = dispatch_queue_create("IZEvent.threadSafetyQueue
  
  Makes no guarantees against deadlocks if queue != main queue.
  */
-public class IZEvent<ValueType> {
-    private typealias Function = (weak: WeakObject, function: ValueType -> Void)
-    private var listeners: [Function] = []
-    private let asynchronous: Bool
-    private let queue: dispatch_queue_t?
+open class IZEvent<ValueType> {
+    fileprivate typealias Function = (weak: WeakObject, function: (ValueType) -> Void)
+    fileprivate var listeners: [Function] = []
+    fileprivate let asynchronous: Bool
+    fileprivate let queue: DispatchQueue?
     
     /**
      Uses the main queue. Synchronous.
@@ -50,20 +52,20 @@ public class IZEvent<ValueType> {
      Uses the main queue.
      */
     public convenience init(synchronous: Bool) {
-        self.init(synchronous: synchronous, queue: dispatch_get_main_queue())
+        self.init(synchronous: synchronous, queue: DispatchQueue.main)
     }
     
     /**
      Synchronous. If queue is passed in as nil, then GCD won't be used at all (nil does not mean "main queue").
      */
-    public convenience init(queue: dispatch_queue_t?) {
+    public convenience init(queue: DispatchQueue?) {
         self.init(synchronous: true, queue: queue)
     }
     
     /**
      If queue is passed in as nil, then GCD won't be used at all (nil does not mean "main queue").
      */
-    public init(synchronous: Bool, queue: dispatch_queue_t?) {
+    public init(synchronous: Bool, queue: DispatchQueue?) {
         self.asynchronous = !synchronous
         self.queue = queue
         assert(queue != nil || synchronous, "Cannot dispatch asynchronously without a queue.")
@@ -76,7 +78,7 @@ public class IZEvent<ValueType> {
      If you call this again with the same instance, the previously associated function will be overridden with this one.
      In other words, only one function per instance can be registered with an event at a time.
      */
-    public func register<InstanceType: AnyObject>(instance: InstanceType, function: InstanceType -> ValueType -> Void) {
+    open func register<InstanceType: AnyObject>(_ instance: InstanceType, function: @escaping (InstanceType) -> (ValueType) -> Void) {
         threadSafety {
             self.removeNullListeners()
             
@@ -102,7 +104,7 @@ public class IZEvent<ValueType> {
      
      Only 1 function per class is supported.
      */
-    public func register<InstanceType: AnyObject>(instanceType: InstanceType.Type, function: ValueType -> Void) {
+    open func register<InstanceType: AnyObject>(_ instanceType: InstanceType.Type, function: @escaping (ValueType) -> Void) {
         threadSafety {
             self.removeNullListeners()
             
@@ -119,45 +121,45 @@ public class IZEvent<ValueType> {
         }
     }
     
-    private func threadSafety(closure: () -> Void) {
-        dispatch_sync(threadSafetyQueue, closure)
+    fileprivate func threadSafety(_ closure: () -> Void) {
+        threadSafetyQueue.sync(execute: closure)
     }
     
     /**
      We manually clean up listeners that have deallocated whenever setFunction or emit is called.
      */
-    private func removeNullListeners() {
+    fileprivate func removeNullListeners() {
         listeners = listeners.filter({ $0.weak.object != nil })
     }
     
     // Can unregister either an instance or an individual class.
-    public func unregister(instance: AnyObject) {
+    open func unregister(_ instance: AnyObject) {
         threadSafety {
             self._unregister(instance)
         }
     }
     
-    private func _unregister(instance: AnyObject) {
+    fileprivate func _unregister(_ instance: AnyObject) {
         self.removeNullListeners()
-        if let index = self.listeners.indexOf({ $0.weak.object === instance }) {
-            self.listeners.removeAtIndex(index)
+        if let index = self.listeners.index(where: { $0.weak.object === instance }) {
+            self.listeners.remove(at: index)
         }
     }
     
-    public func unregisterAll() {
+    open func unregisterAll() {
         threadSafety {
             self.listeners.removeAll()
         }
     }
     
-    public func post(value: ValueType) {
+    open func post(_ value: ValueType) {
         post([value])
     }
     
     /**
      Calls all functions registered with this event.
      */
-    private func post(values: [ValueType]) {
+    fileprivate func post(_ values: [ValueType]) {
         var functions: [Function]?
         
         threadSafety {
@@ -176,7 +178,7 @@ public class IZEvent<ValueType> {
         }
     }
     
-    private func execute(listeners: [Function], value: ValueType) {
+    fileprivate func execute(_ listeners: [Function], value: ValueType) {
         let exec = { () -> Void in
             for listener in listeners {
                 listener.function(value)
@@ -184,12 +186,12 @@ public class IZEvent<ValueType> {
         }
 
         if asynchronous {
-            dispatch_async(queue!, exec)
-        } else if queue === dispatch_get_main_queue() && NSThread.isMainThread() {
+            queue!.async(execute: exec)
+        } else if queue === DispatchQueue.main && Thread.isMainThread {
             // Don't deadlock.
             exec()
         } else if let queue = queue {
-            dispatch_sync(queue, exec)
+            queue.sync(execute: exec)
         } else {
             exec()
         }

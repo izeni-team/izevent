@@ -7,15 +7,14 @@
 //
 
 import XCTest
-import IZEvent
 @testable import Example
 
 class Listener: Equatable, CustomDebugStringConvertible {
     static var orderOfDelivery = [Listener]()
     static var staticFuncDelivered = false
     
-    let id = NSUUID()
-    var noArgDate: NSDate?
+    let id = UUID()
+    var noArgDate: Date?
     var stringArgValue: String?
     var multiArgValue: (str: String, int: Int)?
     
@@ -29,7 +28,7 @@ class Listener: Equatable, CustomDebugStringConvertible {
     }
     
     func noArg() {
-        noArgDate = NSDate()
+        noArgDate = Date()
         delivered()
     }
     
@@ -37,12 +36,12 @@ class Listener: Equatable, CustomDebugStringConvertible {
         return id.debugDescription
     }
     
-    func stringArg(string: String) {
+    func stringArg(_ string: String) {
         stringArgValue = string
         delivered()
     }
     
-    func multiArg(string: String, integer: Int) {
+    func multiArg(_ string: String, integer: Int) {
         multiArgValue = (str: string, int: integer)
         delivered()
     }
@@ -75,12 +74,12 @@ class ExampleTests: XCTestCase {
         // This is an example of a functional test case.
         // Use XCTAssert and related functions to verify your tests produce the correct results.
         
-        let expectation = self.expectationWithDescription("Event Listening")
+        let expectation = self.expectation(description: "Event Listening")
         
         // Test being run from the main thread.
         self.testNoArgs(synchronous: true) {
             // Test being run from a background thread.
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0)) { () -> Void in
+            DispatchQueue.global(qos: .background).async {
                 self.testNoArgs(synchronous: true) {
                     self.testNoArgs(synchronous: false) {
                         self.testOneArg {
@@ -93,13 +92,13 @@ class ExampleTests: XCTestCase {
             }
         }
         
-        self.waitForExpectationsWithTimeout(60) { (error) -> Void in
+        self.waitForExpectations(timeout: 60) { (error) -> Void in
             XCTAssertNil(error)
         }
     }
     
-    func testNoArgs(synchronous synchronous: Bool, completion: () -> Void) {
-        let event = IZEvent<Void>(synchronous: synchronous, queue: dispatch_get_main_queue())
+    func testNoArgs(synchronous: Bool, completion: @escaping () -> Void) {
+        let event = IZEvent<Void>(synchronous: synchronous, queue: DispatchQueue.main)
         let listenerA = Listener()
         let listenerB = Listener()
         let wait = self.wait
@@ -159,7 +158,7 @@ class ExampleTests: XCTestCase {
         }
     }
     
-    func testOneArg(completion: () -> Void) {
+    func testOneArg(_ completion: () -> Void) {
         let event = IZEvent<String>(synchronous: true)
         let listener = Listener()
         event.register(listener, function: Listener.stringArg)
@@ -168,7 +167,7 @@ class ExampleTests: XCTestCase {
         completion()
     }
     
-    func testMultipleArgs(completion: () -> Void) {
+    func testMultipleArgs(_ completion: @escaping () -> Void) {
         let event = IZEvent<(str: String, int: Int)>(synchronous: false)
         let listener = Listener()
         
@@ -182,16 +181,7 @@ class ExampleTests: XCTestCase {
         }
     }
     
-    func testPostInForeground() {
-        let event = IZEvent<Void>()
-        let listener = Listener()
-        event.register(listener, function: Listener.noArg)
-        assert(UIApplication.sharedApplication().applicationState == .Active)
-        event.postWhenAppEntersForeground()
-        XCTAssert(Listener.orderOfDelivery == [listener])
-    }
-    
-    func wait(closure: () -> Void) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, Int64(Float(NSEC_PER_SEC) * 0.01)), dispatch_get_main_queue(), closure)
+    func wait(_ closure: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + Double(Int64(Float(NSEC_PER_SEC) * 0.01)) / Double(NSEC_PER_SEC), execute: closure)
     }
 }

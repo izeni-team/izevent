@@ -1,0 +1,66 @@
+
+
+extension DispatchQueue {
+    
+    enum SyncTimeoutError: Error {
+        
+        var localizedDescription: String {
+            
+            switch self {
+            case .syncTimeout(let timeout): return "Sync action timed out. Timeout: \(timeout)."
+            }
+        }
+        
+        case syncTimeout(DispatchTime)
+    }
+    
+    func sync<T>(timeout: DispatchTime, execute work: @escaping () throws -> T) throws -> T {
+        
+        let group = DispatchGroup()
+        
+        group.enter()
+        
+        var value: T?
+        var error: Error?
+        
+        async {
+            
+            do {
+                value = try work()
+            } catch let workError {
+                error = workError
+            }
+            
+            group.leave()
+        }
+        
+        group.wait(timeout: timeout)
+        
+        if let value = value {
+            
+            return value
+        } else {
+            throw error ?? SyncTimeoutError.syncTimeout(timeout)
+        }
+    }
+    
+    func sync(timeout: DispatchTime, execute work: @escaping () throws -> ()) throws {
+        
+        try sync(timeout: timeout, execute: work)
+    }
+}
+
+
+
+extension Array {
+    
+    @discardableResult public mutating func removeFirst(where predicate: (Element) throws -> Bool) rethrows -> Element? {
+        
+        if let index = try index(where: predicate) {
+            
+            return remove(at: index)
+        } else {
+            return nil
+        }
+    }
+}

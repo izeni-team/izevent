@@ -55,18 +55,20 @@ open class IZEvent<ValueType> {
     
     open var sync: Bool
     
+    open var syncTimeout: DispatchTime?
+    
     /// init without a targetQueue
     init() {
         
-        self.targetQueue = nil
         self.sync = false
     }
     
     /// init with a queue to define sync (default = true)
-    init(targetQueue: DispatchQueue, sync: Bool = true) {
+    init(targetQueue: DispatchQueue, sync: Bool = true, syncTimeout: DispatchTime? = nil) {
         
         self.targetQueue = targetQueue
         self.sync = sync
+        self.syncTimeout = syncTimeout
     }
     
     /// can pass in a function that returns void ( captures () (or Void) as Any )
@@ -128,15 +130,18 @@ open class IZEvent<ValueType> {
     }
     
     // gets the current values through the safetyQueue
-    fileprivate func getValues() -> (Listeners, DispatchQueue?, Bool) {
+    fileprivate func getValues() -> (Listeners, DispatchQueue?, Bool, DispatchTime?) {
         
         return threadSafety.sync {
             
             filterListeners()
             
-            return (listeners, targetQueue, sync)
+            return (listeners, targetQueue, sync, syncTimeout)
         }
     }
+    
+    // shouldn't get changed, only to avoid errors
+    public typealias ReturnType = [Any?]
     
     /**
      Calls the listeners capturing the value and returning the results
@@ -146,28 +151,31 @@ open class IZEvent<ValueType> {
      warning: where sync = true && the queue != .main && queue is (current queue) will be fatal (to avoid deadlock)
      
      */
-    @discardableResult open func post(_ captureValue: ValueType) -> [Any?] {
+    @discardableResult open func post(_ captureValue: ValueType) -> ReturnType? {
         
-        let (listeners, queue, sync) = getValues()
-        
-        return post(block: {
+        return post { listeners in
             
-            var values: [Any?] = []
-            
-            for listener in listeners {
+            return {
                 
-                values.append(listener.function(captureValue))
+                var values: ReturnType = []
+                
+                for listener in listeners {
+                    
+                    values.append(listener.function(captureValue))
+                }
+                
+                return values
             }
-            
-            return values
-            
-        }, queue: queue, sync: sync)
+        }
     }
     
     
     // figures out which queue and method to call when posting
-    fileprivate func post(block: @escaping ()->[Any?], queue: DispatchQueue?, sync: Bool) -> [Any?] {
+    fileprivate func post(getBlock: @escaping (Listeners)->()->ReturnType) -> ReturnType? {
         
+        let (listeners, queue, sync, syncTimeout) = getValues()
+        
+        let block = getBlock(listeners)
         
         if let queue = queue {
             
@@ -179,26 +187,24 @@ open class IZEvent<ValueType> {
                     
                 } else {
                     
-                    // OH_GEEZ_HOPE_DIZ_DOESNT_DEADLOCK
-                    
-                    // Nope, just crash.
-                    
                     dispatchPrecondition(condition: .notOnQueue(queue))
                     
-                    return queue.sync {
+                    if let syncTimeout = syncTimeout {
                         
-                        return block()
+                        return try? queue.sync(timeout: syncTimeout, execute: block)
+                    } else {
+                        return queue.sync(execute: block)
                     }
                 }
                 
             } else {
                 
-                queue.async {
-                    
+                queue.async{
+                
                     _ = block()
                 }
                 
-                return []
+                return nil
             }
             
         } else {
@@ -211,25 +217,25 @@ open class IZEvent<ValueType> {
 extension IZEvent where ValueType: AnyObject {
     
     ///posts the value weakly.
-    @discardableResult open func post(weak value: ValueType) -> [Any?] {
+    @discardableResult open func post(weak value: ValueType) -> ReturnType? {
         
-        let (listeners, queue, sync) = getValues()
-        
-        return post(block: { [weak value] in
+        return post { listeners in
             
-            guard let value = value else {
-                return []
-            }
-            
-            var values: [Any?] = []
-            
-            for listener in listeners {
+            return { [weak value] in
                 
-                values.append(listener.function(value))
+                guard let value = value else {
+                    return []
+                }
+                
+                var values: ReturnType = []
+                
+                for listener in listeners {
+                    
+                    values.append(listener.function(value))
+                }
+                
+                return values
             }
-            
-            return values
-            
-        }, queue: queue, sync: sync)
+        }
     }
 }

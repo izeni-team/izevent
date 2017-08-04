@@ -55,8 +55,6 @@ open class IZEvent<ValueType> {
     
     open var sync: Bool
     
-    open var syncTimeout: DispatchTime?
-    
     /// init without a targetQueue
     init() {
         
@@ -64,11 +62,10 @@ open class IZEvent<ValueType> {
     }
     
     /// init with a queue to define sync (default = true)
-    init(targetQueue: DispatchQueue, sync: Bool = true, syncTimeout: DispatchTime? = nil) {
+    init(targetQueue: DispatchQueue, sync: Bool = true) {
         
         self.targetQueue = targetQueue
         self.sync = sync
-        self.syncTimeout = syncTimeout
     }
     
     /// can pass in a function that returns void ( captures () (or Void) as Any )
@@ -130,13 +127,13 @@ open class IZEvent<ValueType> {
     }
     
     // gets the current values through the safetyQueue
-    fileprivate func getValues() -> (Listeners, DispatchQueue?, Bool, DispatchTime?) {
+    fileprivate func getValues() -> (Listeners, DispatchQueue?, Bool) {
         
         return threadSafety.sync {
             
             filterListeners()
             
-            return (listeners, targetQueue, sync, syncTimeout)
+            return (listeners, targetQueue, sync)
         }
     }
     
@@ -173,7 +170,7 @@ open class IZEvent<ValueType> {
     // figures out which queue and method to call when posting
     fileprivate func post(getBlock: @escaping (Listeners)->()->ReturnType) -> ReturnType? {
         
-        let (listeners, queue, sync, syncTimeout) = getValues()
+        let (listeners, queue, sync) = getValues()
         
         let block = getBlock(listeners)
         
@@ -189,12 +186,7 @@ open class IZEvent<ValueType> {
                     
                     dispatchPrecondition(condition: .notOnQueue(queue))
                     
-                    if let syncTimeout = syncTimeout {
-                        
-                        return try? queue.sync(timeout: syncTimeout, execute: block)
-                    } else {
-                        return queue.sync(execute: block)
-                    }
+                    return queue.sync(execute: block)
                 }
                 
             } else {

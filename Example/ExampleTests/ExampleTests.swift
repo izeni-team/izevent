@@ -101,7 +101,7 @@ class ExampleTests: XCTestCase {
         let event = IZEvent<Void>(synchronous: synchronous, queue: DispatchQueue.main)
         let listenerA = Listener()
         let listenerB = Listener()
-        let wait = self.wait
+        let wait = self.wait(_:)
         
         let reset = { () -> Void in
             listenerA.reset()

@@ -12,13 +12,13 @@ IZEvent is a pure-Swift alternative to NSNotificationCenter. It strives to be ea
 Add the folowing to your Podfile:
 
 ```
-pod 'IZEvent', :git => 'https://dev.izeni.net/bhenderson/izevent.git'
+pod 'IZEvent', :git => 'https://github.com/izeni-team/izevent.git'
 ```
 
 If you want to specify a specific version of IZEvent:
 
 ```
-pod 'IZEvent', :git => 'https://dev.izeni.net/bhenderson/izevent.git', :commit => 'v0.2.0'
+pod 'IZEvent', :git => 'https://github.com/izeni-team/izevent.git', :commit => 'v0.2.0'
 ```
 
 Or via Carthage:

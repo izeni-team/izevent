@@ -21,12 +21,6 @@ If you want to specify a specific version of IZEvent:
 pod 'IZEvent', :git => 'https://github.com/izeni-team/izevent.git', :commit => 'v0.2.0'
 ```
 
-Or via Carthage:
-
-```
-pod "izeni-team/izevent" ~> 0.3
-```
-
 ## Usage
 
 1: Create an event

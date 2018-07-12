@@ -1,0 +1,13 @@
+
+extension Array {
+    
+    @discardableResult public mutating func removeFirst(where predicate: (Element) throws -> Bool) rethrows -> Element? {
+        
+        if let index = try index(where: predicate) {
+            
+            return remove(at: index)
+        } else {
+            return nil
+        }
+    }
+}

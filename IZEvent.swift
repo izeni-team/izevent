@@ -1,3 +1,4 @@
+
 // The MIT License (MIT)
 //
 // Copyright (c) 2016 Izeni, Inc.
@@ -17,14 +18,7 @@
 
 import Foundation
 
-/**
- Used to tell whether or not the event has outlived the listener.
- */
-private struct WeakObject {
-    weak var object: AnyObject?
-}
-
-fileprivate let threadSafetyQueue = DispatchQueue(label: "IZEvent.threadSafetyQueue")
+fileprivate let izEventThreadSafetyQueue = DispatchQueue(label: "IZEvent.threadSafety")
 
 /**
  A pure-swift alternative to NSNotificationCenter. It's safer and more convenient.
@@ -33,167 +27,207 @@ fileprivate let threadSafetyQueue = DispatchQueue(label: "IZEvent.threadSafetyQu
  
  By default events are delivered synchronously.
  
- Makes no guarantees against deadlocks if queue != main queue.
+ Crashes against deadlocks.
  */
 open class IZEvent<ValueType> {
-    fileprivate typealias Function = (weak: WeakObject, function: (ValueType) -> Void)
-    fileprivate var listeners: [Function] = []
-    fileprivate let asynchronous: Bool
-    fileprivate let queue: DispatchQueue?
     
-    /**
-     Uses the main queue. Synchronous.
-     */
-    public convenience init() {
-        self.init(synchronous: true)
-    }
-    
-    /**
-     Uses the main queue.
-     */
-    public convenience init(synchronous: Bool) {
-        self.init(synchronous: synchronous, queue: DispatchQueue.main)
-    }
-    
-    /**
-     Synchronous. If queue is passed in as nil, then GCD won't be used at all (nil does not mean "main queue").
-     */
-    public convenience init(queue: DispatchQueue?) {
-        self.init(synchronous: true, queue: queue)
-    }
-    
-    /**
-     If queue is passed in as nil, then GCD won't be used at all (nil does not mean "main queue").
-     */
-    public init(synchronous: Bool, queue: DispatchQueue?) {
-        self.asynchronous = !synchronous
-        self.queue = queue
-        assert(queue != nil || synchronous, "Cannot dispatch asynchronously without a queue.")
-    }
-    
-    /**
-     There can only be one function registered per instance. Check the event declaration to see whether or not it will
-     be synchronous and which queue it will be delivered on.
-     
-     If you call this again with the same instance, the previously associated function will be overridden with this one.
-     In other words, only one function per instance can be registered with an event at a time.
-     */
-    open func register<InstanceType: AnyObject>(_ instance: InstanceType, function: @escaping (InstanceType) -> (ValueType) -> Void) {
-        threadSafety {
-            self.removeNullListeners()
+    struct Listener {
+        
+        weak var weakObject: AnyObject?
+        
+        typealias Function = (ValueType)->Any?
+        
+        let function: Function
+        
+        var listening: Bool {
             
-            // If called again, put it to the end of the list.
-            self._unregister(instance)
-            
-            self.listeners.append((
-                // Used to tell whether or not this event has outlived the listener instance.
-                weak: WeakObject(object: instance),
-                
-                // Instance must be weak to avoid a retention cycle (in other words, to avoid memory leaks).
-                function: { [weak instance] (argument) -> Void in
-                    if let instance = instance {
-                        function(instance)(argument)
-                    }
-                }
-            ))
+            return weakObject != nil
         }
     }
     
-    /**
-     Used for setting class/static functions as recipients, as opposed to instances.
-     
-     Only 1 function per class is supported.
-     */
-    open func register<InstanceType: AnyObject>(_ instanceType: InstanceType.Type, function: @escaping (ValueType) -> Void) {
-        threadSafety {
-            self.removeNullListeners()
+    typealias Listeners = [Listener]
+    
+    fileprivate var listeners: Listeners = []
+    
+    fileprivate let threadSafety = izEventThreadSafetyQueue
+    
+    open var targetQueue: DispatchQueue?
+    
+    open var sync: Bool
+    
+    /// init without a targetQueue
+    init() {
+        
+        self.sync = false
+    }
+    
+    /// init with a queue to define sync (default = true)
+    init(targetQueue: DispatchQueue, sync: Bool = true) {
+        
+        self.targetQueue = targetQueue
+        self.sync = sync
+    }
+    
+    /// can pass in a function that returns void ( captures () (or Void) as Any )
+    /// associates the instance as the owner of the function
+    /// if the owner becomes nil, the function is removed
+    open func register(_ instance: AnyObject, function: @escaping (ValueType) -> Any?) {
+        
+        threadSafety.sync {
             
-            // If called again, put it to the end of the list.
-            self._unregister(instanceType)
+            filterListeners()
             
-            self.listeners.append((
-                // Used to tell whether or not this event has outlived the listener instance.
-                weak: WeakObject(object: instanceType),
+            listeners.removeFirst(where: {$0.weakObject === instance})
+            
+            listeners.append(
                 
-                // Instance must be weak to avoid a retention cycle (in other words, to avoid memory leaks).
-                function: function
-            ))
+                Listener(
+                    weakObject: instance,
+                    function: function
+                )
+            )
         }
     }
     
-    fileprivate func threadSafety(_ closure: () -> Void) {
-        threadSafetyQueue.sync(execute: closure)
+    /// calls the function then registers
+    open func register<Instance: AnyObject>(_ instance: Instance, function: @escaping (Instance) -> (ValueType) -> Any?) {
+        
+        register(instance, function: function(instance))
     }
     
-    /**
-     We manually clean up listeners that have deallocated whenever setFunction or emit is called.
-     */
-    fileprivate func removeNullListeners() {
-        listeners = listeners.filter({ $0.weak.object != nil })
+    /// registers the type as an AnyObject
+    open func register(_ instanceType: AnyObject.Type, function: @escaping (ValueType) -> Any?) {
+        
+        register(instanceType as AnyObject, function: function)
     }
     
-    // Can unregister either an instance or an individual class.
+    // filters the listeners to confirm that the object is not deallocated
+    fileprivate func filterListeners() {
+        
+        listeners = listeners.filter({$0.listening})
+    }
+    
+    /// removes the Listener for that instance
     open func unregister(_ instance: AnyObject) {
-        threadSafety {
-            self._unregister(instance)
+        threadSafety.sync {
+            listeners.removeFirst(where: {$0.weakObject === instance})
         }
     }
     
-    fileprivate func _unregister(_ instance: AnyObject) {
-        self.removeNullListeners()
-        if let index = self.listeners.index(where: { $0.weak.object === instance }) {
-            self.listeners.remove(at: index)
-        }
+    /// calls unregister with instanceType as AnyObject
+    open func unregister(_ instanceType: AnyObject.Type) {
+        
+        unregister(instanceType as AnyObject)
     }
     
     open func unregisterAll() {
-        threadSafety {
-            self.listeners.removeAll()
+        threadSafety.sync {
+            listeners.removeAll()
         }
     }
     
-    open func post(_ value: ValueType) {
-        post([value])
+    // gets the current values through the safetyQueue
+    fileprivate func getValues() -> (Listeners, DispatchQueue?, Bool) {
+        
+        return threadSafety.sync {
+            
+            filterListeners()
+            
+            return (listeners, targetQueue, sync)
+        }
     }
+    
+    // shouldn't get changed, only to avoid errors
+    public typealias ReturnType = [Any?]
     
     /**
-     Calls all functions registered with this event.
+     Calls the listeners capturing the value and returning the results
+     
+     if sync = false and queue != nil, returns an empty array
+     
+     warning: where sync = true && the queue != .main && queue is (current queue) will be fatal (to avoid deadlock)
+     
      */
-    fileprivate func post(_ values: [ValueType]) {
-        var functions: [Function]?
+    @discardableResult open func post(_ captureValue: ValueType) -> ReturnType? {
         
-        threadSafety {
-            guard !self.listeners.isEmpty else {
-                return
-            }
+        return post { listeners in
             
-            self.removeNullListeners()
-            functions = self.listeners
-        }
-        
-        if let functions = functions {
-            for value in values {
-                self.execute(functions, value: value)
+            return {
+                
+                var values: ReturnType = []
+                
+                for listener in listeners {
+                    
+                    values.append(listener.function(captureValue))
+                }
+                
+                return values
             }
         }
     }
     
-    fileprivate func execute(_ listeners: [Function], value: ValueType) {
-        let exec = { () -> Void in
-            for listener in listeners {
-                listener.function(value)
+    
+    // figures out which queue and method to call when posting
+    fileprivate func post(getBlock: @escaping (Listeners)->()->ReturnType) -> ReturnType? {
+        
+        let (listeners, queue, sync) = getValues()
+        
+        let block = getBlock(listeners)
+        
+        if let queue = queue {
+            
+            if sync {
+                
+                if queue == .main && Thread.isMainThread {
+                    
+                    return block()
+                    
+                } else {
+                    
+                    dispatchPrecondition(condition: .notOnQueue(queue))
+                    
+                    return queue.sync(execute: block)
+                }
+                
+            } else {
+                
+                queue.async{
+                
+                    _ = block()
+                }
+                
+                return nil
             }
-        }
-
-        if asynchronous {
-            queue!.async(execute: exec)
-        } else if queue === DispatchQueue.main && Thread.isMainThread {
-            // Don't deadlock.
-            exec()
-        } else if let queue = queue {
-            queue.sync(execute: exec)
+            
         } else {
-            exec()
+            
+            return block()
+        }
+    }
+}
+
+extension IZEvent where ValueType: AnyObject {
+    
+    ///posts the value weakly.
+    @discardableResult open func post(weak value: ValueType) -> ReturnType? {
+        
+        return post { listeners in
+            
+            return { [weak value] in
+                
+                guard let value = value else {
+                    return []
+                }
+                
+                var values: ReturnType = []
+                
+                for listener in listeners {
+                    
+                    values.append(listener.function(value))
+                }
+                
+                return values
+            }
         }
     }
 }
